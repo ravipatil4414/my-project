@@ -63,7 +63,7 @@ pipeline {
                     id: "MAVEN_RESOLVER",
                     serverId: "jfrog-server",
                     releaseRepo: "libs-release",
-                    snapshotRepo: "lib-snapshot"
+                    snapshotRepo: "libs-snapshot"
                 )
             }
         }
@@ -83,6 +83,37 @@ pipeline {
                 rtPublishBuildInfo (
                     serverId: "jfrog-server"
                 )
+            }
+        }
+        stage('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+        stage("Build & Push Docker Image") {
+            steps {
+                script {
+                    docker.withRegistry('', DOCKER_PASS) {
+                        def docker_image = docker.build "${IMAGE_NAME}:${IMAGE_TAG}"
+                        docker_image.push "${IMAGE_TAG}"
+                        docker_image.push 'latest'
+                    }
+                }
+            }
+        }
+        stage("Trivy Scan") {
+            steps {
+                script {
+                    sh 'docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image ravipatil44/java-registration-app:latest --no-progress --scanners vuln --exit-code 0 --severity HIGH,CRITICAL --format table > trivyimage.txt'
+                }
+            }
+        }
+        stage('Cleanup Artifacts') {
+            steps {
+                script {
+                    sh "docker rmi -f ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker rmi -f ${IMAGE_NAME}:latest"
+                }
             }
         }
     }
