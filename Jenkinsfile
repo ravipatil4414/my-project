@@ -93,7 +93,7 @@ pipeline {
         stage("Build & Push Docker Image") {
             steps {
                 script {
-                    docker.withRegistry('', DOCKER_PASS) {
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                         def docker_image = docker.build "${IMAGE_NAME}:${IMAGE_TAG}"
                         docker_image.push "${IMAGE_TAG}"
                         docker_image.push 'latest'
