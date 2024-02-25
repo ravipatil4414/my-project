@@ -94,7 +94,7 @@ pipeline {
            steps {
                withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                   script {
-                     docker.withRegistry('', 'docker-hub') {
+                     withDockerRegistry(credentialsId: 'docker-hub', url: 'https://index.docker.io/v1/') {
                         def docker_image = docker.build "${IMAGE_NAME}:${IMAGE_TAG}"
                         docker_image.push "${IMAGE_TAG}"
                         docker_image.push 'latest'
