@@ -90,19 +90,21 @@ pipeline {
                 sh "trivy fs . > trivyfs.txt"
             }
         }
-       stage("Build & Push Docker Image") {
-           steps {
-               withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                  script {
-                     withDockerRegistry(credentialsId: 'docker-hub', url: 'https://index.docker.io/v1/') {
-                        def docker_image = docker.build "${IMAGE_NAME}:${IMAGE_TAG}"
-                        docker_image.push "${IMAGE_TAG}"
-                        docker_image.push 'latest'
-                     }
-                  }
-               }
-           }
-       }
+        stage('Build docker image'){
+            steps{
+                script{
+                    sh 'docker build -t ravipatil44/java-registration-app:v1 .'
+                }
+            }
+        }
+        stage('Docker login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh "echo $PASS | docker login -u $USER --password-stdin"
+                    sh 'docker push ravipatil44/java-registration-app:v1'
+                }
+            }
+        }
         stage("Trivy Scan") {
             steps {
                 script {
