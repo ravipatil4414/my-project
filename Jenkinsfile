@@ -50,7 +50,7 @@ pipeline {
             steps {
                 rtServer (
                     id: "jfrog-server",
-                    url: "http://13.233.238.126:8082/artifactory",
+                    url: "http://13.232.123.216:8082/artifactory",
                     credentialsId: "jfrog"
                 )
                 rtMavenDeployer (
