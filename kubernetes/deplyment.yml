@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registerapp-deployment
+  labels:
+    app: register-app
+spec:
+   replicas: 2
+   selector:
+     matchLabels:
+       app: register-app
+   template:
+     metadata:
+       name: my-temp
+       labels:
+         app: register-app
+     spec: 
+        terminationGracePeriodSeconds: 30
+        containers:
+           - name: register-app
+             image:  ravipatil44/java-registration-app:v1
+             imagePullPolicy: "Always"
+             ports:
+                - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: register-svc
+spec:
+  ports:
+   - port: 8080
+     targetPort: 8080
+  type: LoadBalancer
+  selector:
+     app: register-app
+
