@@ -120,6 +120,19 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to kubernets'){
+           steps {
+              script {
+                  dir('kubernetes') {
+                     kubeconfig(credentialsID: 'kubernetes', serverUrl: '') {
+                     sh 'kubectl apply -f deployment.yml'
+                     sh 'kubectl rollout restart deployment.apps/registerapp-deployment
+                      }
+                  }
+              }
+           }
+        }
+                       
     }
     post {
       always {
