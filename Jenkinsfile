@@ -1,150 +1,33 @@
 pipeline {
     agent any
-    tools {
-        maven 'maven'
-    }
-    environment {
-        SCANNER_HOME = tool 'sonar-scanner'
-        APP_NAME = "java-registration-app"
-        RELEASE = "1.0.0"
-        DOCKER_USER = 'ravipatil44'
-        DOCKER_PASS = 'docker-hub'
-        IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
-        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-    }
+    
     stages {
-        stage('clean workspace') {
+        stage('Checkout') {
             steps {
-                cleanWs()
+                git branch: 'master', credentialsId: 'git-hub', url: 'https://github.com/ravipatil4414/java_project.git'
             }
         }
-        stage('Checkout from Git') {
+        
+        stage('Build') {
             steps {
-                git branch: 'main', credentialsId: 'git-hub', url: 'https://github.com/ravipatil4414/my-project.git'
+                sh 'mvn clean package' // Maven build to generate WAR
             }
         }
-        stage('Build Package') {
-            steps {
-                dir('webapp') {
-                    sh 'mvn package'
-                }
-            }
-        }
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube-Server') {
-                    dir('webapp') {
-                        sh 'mvn -U clean install sonar:sonar'
-                    }
-                }
-            }
-        }
-        stage('Quality Gate') {
+        
+        stage('Docker Build') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube-Token'
+                    docker.build('my-java-app', '-f Dockerfile .') // Build Docker image using Dockerfile
                 }
             }
         }
-        stage('Artifactory configuration') {
-            steps {
-                rtServer (
-                    id: "jfrog-server",
-                    url: "http://13.201.87.58:8082/artifactory",
-                    credentialsId: "jfrog"
-                )
-                rtMavenDeployer (
-                    id: "MAVEN_DEPLOYER",
-                    serverId: "jfrog-server",
-                    releaseRepo: "libs-release-local",
-                    snapshotRepo: "libs-snapshot-local"
-                )
-                rtMavenResolver (
-                    id: "MAVEN_RESOLVER",
-                    serverId: "jfrog-server",
-                    releaseRepo: "libs-release",
-                    snapshotRepo: "libs-snapshot"
-                )
-            }
-        }
-        stage('Deploy Artifacts') {
-            steps {
-                rtMavenRun (
-                    tool: "maven",
-                    pom: 'webapp/pom.xml',
-                    goals: 'clean install',
-                    deployerId: "MAVEN_DEPLOYER",
-                    resolverId: "MAVEN_RESOLVER"
-                )
-            }
-        }
-        stage('Publish build info') {
-            steps {
-                rtPublishBuildInfo (
-                    serverId: "jfrog-server"
-                )
-            }
-        }
-        stage('TRIVY FS SCAN') {
-            steps {
-                sh "trivy fs . > trivyfs.txt"
-            }
-        }
-        stage('Build docker image'){
-            steps{
-                script{
-                    sh 'docker build -t ravipatil44/java-registration-app:v1 .'
-                }
-            }
-        }
-        stage('Docker login') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-                    sh "echo $PASS | docker login -u $USER --password-stdin"
-                    sh 'docker push ravipatil44/java-registration-app:v1'
-                }
-            }
-        }
-        stage("Trivy Scan") {
+        
+        stage('Docker Run') {
             steps {
                 script {
-                    sh 'docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image ravipatil44/java-registration-app:v1 --no-progress --scanners vuln --exit-code 0 --severity HIGH,CRITICAL --format table > trivyimage.txt'
+                    sh 'docker run -p 9090:9090 --name my-java-app-container-jar -d my-java-app-jar' // Run Docker container in detached mode
                 }
             }
         }
-        stage('Cleanup Artifacts') {
-            steps {
-                script {
-                    sh "docker rmi -f ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker rmi -f ${IMAGE_NAME}:v1"
-                }
-            }
-        }
-        stage('Deploy to kubernets'){
-           steps {
-              script {
-                  dir('kubernetes') {
-                     kubeconfig(kubeconfigId: 'kubernetes-id', serverUrl: '') {
-                     sh 'kubectl apply -f deployment.yml'
-                     sh 'kubectl rollout restart deployment.apps/registerapp-deployment'
-                      }
-                  }
-              }
-           }
-        }
-                       
     }
-    post {
-      always {
-        emailext attachLog: true,
-            subject: "'${currentBuild.result}'",
-            body: "Project: ${env.JOB_NAME}<br/>"+
-                 "Build Number: ${env.BUILD_NUMBER}<br/>"+
-                 "URL: ${env.BUILD_URL}<br/>",
-            to: 'ravipatil8184@gmail.com',
-            attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
-      }
-    }
-
 }
-
